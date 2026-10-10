@@ -1,7 +1,7 @@
 # Chess Visualisation Trainer
 
-A trainer for calculation and visualisation. It shows a realistic chess position
-and a sequence of moves, then asks a question about the resulting position,
+A trainer for calculation and visualisation. It shows a position from a real
+game and a sequence of moves, then asks a question about the resulting position,
 which you answer without moving the pieces. For example: *"Nxe4 dxe4 — what is
 the material balance now?"*
 
@@ -30,28 +30,44 @@ Other commands:
 
 | Command           | What it does                                       |
 | ----------------- | -------------------------------------------------- |
-| `npm test`        | Run the test suite once (takes about 30 seconds)   |
+| `npm test`        | Run the test suite once (takes a few seconds)      |
 | `npm run build`   | Type-check and build a production bundle to `dist/` |
 | `npm run preview` | Serve the production build locally                 |
 
 ## How exercises are generated
 
-1. **Starting position:** play one of 24 main-line openings
-   (`src/lib/openings.ts`), then up to 7 extra moves chosen by a small built-in
-   engine so positions vary.
-2. **Move sequence:** the engine plays the requested number of plies, preferring
-   captures and checks among reasonable moves (`src/lib/engine.ts`).
-3. **Question:** one is generated from the final position
+Positions and move sequences come from the
+[Lichess puzzle database](https://database.lichess.org/#puzzles) (CC0). Each
+puzzle is a position from a real game, plus the opponent's move that set up the
+puzzle and the best continuation.
+
+1. **Pick a puzzle** from `public/puzzles.json` whose line is at least as long
+   as the chosen sequence length, and cut the line to that length.
+2. **Show the game position** before the setup move, with the board oriented
+   for the side solving the puzzle.
+3. **Ask a question** about the position after the sequence
    (`src/lib/exercise.ts`):
    - **Material balance:** White minus Black, in points.
    - **What's on a square:** a piece or "empty".
    - **Where did a piece go:** a square or "captured".
    - **Is a move legal:** yes or no.
 
-Generation runs in a Web Worker (`src/lib/generator.worker.ts`), and the next
-exercise is prepared while you work on the current one.
+### Regenerating the puzzle data
+
+`public/puzzles.json` is a sample of about 5,600 popular, well-rated puzzles,
+spread across line lengths. To rebuild it (needs `zstd`, e.g.
+`brew install zstd`):
+
+```sh
+curl -s https://database.lichess.org/lichess_db_puzzle.csv.zst \
+  | zstd -dc | node scripts/build-puzzles.mjs > public/puzzles.json
+```
+
+The script stops reading once it has enough puzzles, so it only streams a small
+part of the roughly 300 MB file. Quotas and quality filters are at the top of
+`scripts/build-puzzles.mjs`.
 
 ## Tech stack
 
 Vite, React and TypeScript, with [chess.js](https://github.com/jhlywa/chess.js)
-for move generation and rules, and Vitest for tests.
+for chess rules and notation, and Vitest for tests.

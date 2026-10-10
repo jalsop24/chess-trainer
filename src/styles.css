@@ -419,3 +419,7 @@ button.move:hover {
   align-items: center;
   gap: 8px;
 }
+
+.meta a {
+  color: var(--accent);
+}

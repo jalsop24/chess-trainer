@@ -2,8 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Color, Square } from "chess.js";
 import { Board } from "./components/Board";
 import { AnswerInput, formatAnswer, type AnswerValue } from "./components/AnswerInput";
-import { ExerciseGenerator } from "./lib/generator";
-import { QUESTION_KINDS, formatMoves, type Exercise, type QuestionKind } from "./lib/exercise";
+import {
+  QUESTION_KINDS,
+  formatMoves,
+  generateExercise,
+  type Exercise,
+  type Puzzle,
+  type QuestionKind,
+} from "./lib/exercise";
 
 interface Settings {
   plies: number;
@@ -37,8 +43,6 @@ function save(key: string, value: unknown) {
   }
 }
 
-const settingsKey = (s: Settings) => `${s.plies}:${[...s.kinds].sort().join(",")}`;
-
 type Phase =
   | { name: "loading" }
   | { name: "error"; message: string }
@@ -51,50 +55,38 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
   const [step, setStep] = useState(0);
 
-  const generatorRef = useRef<ExerciseGenerator | null>(null);
-  const prefetchRef = useRef<{ key: string; promise: Promise<Exercise> } | null>(null);
-  const requestRef = useRef(0); // ignore results from superseded requests
+  const puzzlesRef = useRef<Puzzle[] | null>(null);
 
   useEffect(() => save("settings", settings), [settings]);
   useEffect(() => save("stats", stats), [stats]);
 
-  const prefetch = useCallback((s: Settings) => {
-    const gen = generatorRef.current;
-    if (!gen) return;
-    const promise = gen.generate(s);
-    promise.catch(() => {}); // surfaced when consumed
-    prefetchRef.current = { key: settingsKey(s), promise };
+  const nextExercise = useCallback((s: Settings) => {
+    const puzzles = puzzlesRef.current;
+    if (!puzzles) return;
+    try {
+      setPhase({ name: "asking", exercise: generateExercise({ puzzles, plies: s.plies, kinds: s.kinds }) });
+    } catch (err) {
+      setPhase({ name: "error", message: err instanceof Error ? err.message : String(err) });
+    }
   }, []);
 
-  const nextExercise = useCallback(
-    async (s: Settings) => {
-      const gen = generatorRef.current;
-      if (!gen) return;
-      const request = ++requestRef.current;
-      setPhase({ name: "loading" });
-      const ready = prefetchRef.current?.key === settingsKey(s) ? prefetchRef.current.promise : gen.generate(s);
-      prefetchRef.current = null;
-      try {
-        const exercise = await ready;
-        if (request !== requestRef.current) return;
-        setPhase({ name: "asking", exercise });
-        prefetch(s); // have the following one ready by the time it's needed
-      } catch (err) {
-        if (request !== requestRef.current) return;
-        setPhase({ name: "error", message: err instanceof Error ? err.message : String(err) });
-      }
-    },
-    [prefetch],
-  );
-
   useEffect(() => {
-    const gen = new ExerciseGenerator();
-    generatorRef.current = gen;
-    nextExercise(settings);
+    let cancelled = false;
+    fetch(`${import.meta.env.BASE_URL}puzzles.json`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Couldn't load puzzles (HTTP ${res.status})`);
+        return res.json() as Promise<Puzzle[]>;
+      })
+      .then((puzzles) => {
+        if (cancelled) return;
+        puzzlesRef.current = puzzles;
+        nextExercise(settings);
+      })
+      .catch((err) => {
+        if (!cancelled) setPhase({ name: "error", message: err instanceof Error ? err.message : String(err) });
+      });
     return () => {
-      gen.terminate();
-      generatorRef.current = null;
-      prefetchRef.current = null;
+      cancelled = true;
     };
     // Only on mount; settings changes trigger their own regeneration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,10 +94,7 @@ export default function App() {
 
   const updateSettings = (s: Settings) => {
     setSettings(s);
-    if (s.kinds.length > 0) {
-      prefetchRef.current = null;
-      if (phase.name !== "revealed") nextExercise(s);
-    }
+    if (s.kinds.length > 0 && phase.name !== "revealed") nextExercise(s);
   };
 
   const submit = (given: AnswerValue) => {
@@ -138,7 +127,8 @@ export default function App() {
   }, [phase, settings, nextExercise]);
 
   const exercise = phase.name === "asking" || phase.name === "revealed" ? phase.exercise : null;
-  const orientation: Color = exercise ? (exercise.startFen.split(" ")[1] as Color) : "w";
+  const orientation: Color = exercise?.orientation ?? "w";
+  const toMove = exercise?.startFen.split(" ")[1] === "b" ? "Black" : "White";
 
   let boardFen = exercise?.startFen ?? "8/8/8/8/8/8/8/8 w - - 0 1";
   let highlight: Square[] = [];
@@ -164,7 +154,7 @@ export default function App() {
         <section className="board-area">
           <div className={`board-wrap${phase.name === "loading" ? " board-wrap--loading" : ""}`}>
             <Board fen={boardFen} orientation={orientation} highlight={highlight} />
-            {phase.name === "loading" && <div className="overlay">Setting up a position…</div>}
+            {phase.name === "loading" && <div className="overlay">Loading puzzles…</div>}
           </div>
           {exercise && phase.name === "revealed" && (
             <div className="stepper">
@@ -181,7 +171,12 @@ export default function App() {
           {phase.name === "error" && (
             <div className="card">
               <p className="error">{phase.message}</p>
-              <button className="primary" onClick={() => nextExercise(settings)}>Try again</button>
+              <button
+                className="primary"
+                onClick={() => (puzzlesRef.current ? nextExercise(settings) : location.reload())}
+              >
+                Try again
+              </button>
             </div>
           )}
 
@@ -189,7 +184,15 @@ export default function App() {
             <>
               <div className="card">
                 <div className="meta">
-                  {exercise.opening} · {orientation === "w" ? "White" : "Black"} to move
+                  {toMove} to move · Lichess puzzle rated {exercise.rating}
+                  {phase.name === "revealed" && (
+                    <>
+                      {" · "}
+                      <a href={`https://lichess.org/training/${exercise.puzzleId}`} target="_blank" rel="noreferrer">
+                        Open on Lichess
+                      </a>
+                    </>
+                  )}
                 </div>
                 <ol className="moves">
                   {formatMoves(exercise.startFen, exercise.moves.map((m) => m.san)).map((label, i) => (

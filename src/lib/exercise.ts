@@ -1,6 +1,11 @@
 import { Chess, type Color, type Move, type PieceSymbol, type Square } from "chess.js";
-import { OPENINGS } from "./openings";
-import { PIECE_VALUES, chooseMove, type Rng } from "./engine";
+
+export type Rng = () => number;
+
+export const PIECE_VALUES: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+/** A row of public/puzzles.json: [id, fen, uciMoves, rating]. See scripts/build-puzzles.mjs. */
+export type Puzzle = [id: string, fen: string, moves: string, rating: number];
 
 export type QuestionKind = "material" | "squareContents" | "pieceLocation" | "moveLegality";
 
@@ -28,7 +33,10 @@ export interface SequenceMove {
 }
 
 export interface Exercise {
-  opening: string;
+  puzzleId: string;
+  rating: number;
+  /** The side that solves the puzzle; the board is shown from its point of view. */
+  orientation: Color;
   startFen: string;
   moves: SequenceMove[];
   finalFen: string;
@@ -36,6 +44,7 @@ export interface Exercise {
 }
 
 export interface GenerateOptions {
+  puzzles: Puzzle[];
   plies: number;
   kinds: QuestionKind[];
   rng?: Rng;
@@ -286,38 +295,34 @@ function buildQuestion(
   }
 }
 
-export function generateExercise({ plies, kinds, rng = Math.random }: GenerateOptions): Exercise {
+/** Plays UCI moves (e.g. "e2e4", "e7e8q") from a FEN, returning chess.js moves. */
+export function playUci(fen: string, uci: string[]): Move[] {
+  const chess = new Chess(fen);
+  return uci.map((m) => chess.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] }));
+}
+
+/**
+ * Builds an exercise from a random puzzle whose line has at least `plies`
+ * half-moves. The sequence starts from the real game position (before the
+ * opponent's move that set up the puzzle) and is cut to `plies` half-moves.
+ */
+export function generateExercise({ puzzles, plies, kinds, rng = Math.random }: GenerateOptions): Exercise {
   if (kinds.length === 0) throw new Error("Select at least one question type");
+  const pool = puzzles.filter(([, , moves]) => moves.split(" ").length >= plies);
+  if (pool.length === 0) throw new Error(`No puzzles with a line of ${plies} half-moves`);
   for (let attempt = 0; attempt < 50; attempt++) {
-    const opening = pick(OPENINGS, rng);
-    const chess = new Chess();
-    for (const san of opening.moves.split(" ")) chess.move(san);
-
-    // A few free plies on top of the book line for variety.
-    const extra = Math.floor(rng() * 8);
-    for (let i = 0; i < extra && !chess.isGameOver(); i++) {
-      chess.move(chooseMove(chess, rng, { tolerance: 40, forcingBias: 0 })!);
-    }
-    if (chess.isGameOver()) continue;
-    const startFen = chess.fen();
-
-    const moves: Move[] = [];
-    for (let i = 0; i < plies; i++) {
-      if (chess.isGameOver()) break;
-      const m = chooseMove(chess, rng, { tolerance: 30, forcingBias: 3 });
-      if (!m) break;
-      moves.push(chess.move(m));
-    }
-    if (moves.length !== plies) continue;
-
+    const [puzzleId, startFen, uci, rating] = pick(pool, rng);
+    const moves = playUci(startFen, uci.split(" ").slice(0, plies));
     for (const kind of shuffle(kinds, rng)) {
       const question = buildQuestion(kind, startFen, moves, rng);
       if (!question) continue;
       return {
-        opening: opening.name,
+        puzzleId,
+        rating,
+        orientation: startFen.split(" ")[1] === "w" ? "b" : "w",
         startFen,
         moves: moves.map((m) => ({ san: m.san, from: m.from, to: m.to, fenAfter: m.after })),
-        finalFen: chess.fen(),
+        finalFen: moves[moves.length - 1].after,
         question,
       };
     }
