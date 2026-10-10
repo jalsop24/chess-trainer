@@ -48,7 +48,7 @@ describe("generateExercise", () => {
     it(`produces consistent ${kind} questions`, () => {
       for (let seed = 1; seed <= 20; seed++) {
         const plies = [2, 4, 6, 10][seed % 4];
-        const ex = generateExercise({ puzzles, plies, kinds: [kind], rng: seededRng(seed) });
+        const ex = generateExercise({ puzzles, plies, kinds: [kind], rng: seededRng(seed * 7919) });
         expect(ex.question.kind).toBe(kind);
         expect(ex.moves).toHaveLength(plies);
 
@@ -58,12 +58,18 @@ describe("generateExercise", () => {
         expect(chess.fen()).toBe(ex.finalFen);
 
         const q = ex.question;
+        const puzzle = puzzles.find(([id]) => id === ex.puzzleId)!;
         if (q.kind === "material") {
           const { w, b } = materialCount(chess);
           expect(q.answer).toBe(w - b);
-        } else if (q.kind === "squareContents") {
-          const p = chess.get(q.square);
-          expect(q.answer).toBe(p ? `${p.color}${p.type}` : "empty");
+          // Material only tells the story when there's no mate and the solver is ahead.
+          expect(["crushing", "advantage"]).toContain(puzzle[4]);
+          expect(chess.isCheckmate()).toBe(false);
+          expect(ex.orientation === "w" ? q.answer : -q.answer).toBeGreaterThan(0);
+        } else if (q.kind === "defenders") {
+          const piece = chess.get(q.square)!;
+          expect(piece.type).not.toBe("k");
+          expect(q.answer).toBe(chess.attackers(q.square, piece.color).length);
         } else if (q.kind === "pieceLocation") {
           if (q.answer !== "captured") expect(chess.get(q.answer)).toBeTruthy();
         } else if (q.kind === "moveLegality") {
@@ -74,4 +80,24 @@ describe("generateExercise", () => {
       }
     });
   }
+});
+
+describe("piece location questions", () => {
+  it("only ask about pieces that moved twice, or moved and were captured", () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const ex = generateExercise({ puzzles, plies: 4, kinds: ["pieceLocation"], rng: seededRng(seed) });
+      const [, start] = ex.question.prompt.match(/that started on ([a-h][1-8])/)!;
+      // Follow the piece through the line to count its moves.
+      let square = start;
+      let moves = 0;
+      for (const m of ex.moves) {
+        if (m.from === square) {
+          square = m.to;
+          moves++;
+        }
+      }
+      const captured = ex.question.answer === "captured";
+      expect(moves >= 2 || (captured && moves >= 1), ex.puzzleId).toBe(true);
+    }
+  });
 });

@@ -11,10 +11,6 @@ const GLYPHS: Record<PieceSymbol, string> = {
   p: "♟︎",
 };
 
-export function pieceGlyph(type: PieceSymbol): string {
-  return GLYPHS[type];
-}
-
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
 interface BoardProps {

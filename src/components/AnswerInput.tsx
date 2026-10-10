@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { Color, PieceSymbol, Square } from "chess.js";
-import { Board, pieceGlyph } from "./Board";
-import { describePiece, type PieceCode, type Question } from "../lib/exercise";
+import type { Color, Square } from "chess.js";
+import { Board } from "./Board";
+import type { Question } from "../lib/exercise";
 
-export type AnswerValue = number | boolean | PieceCode | Square | "empty" | "captured";
+export type AnswerValue = number | boolean | Square | "captured";
 
 interface AnswerInputProps {
   question: Question;
@@ -12,14 +12,13 @@ interface AnswerInputProps {
 }
 
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
-const PIECE_ORDER: PieceSymbol[] = ["k", "q", "r", "b", "n", "p"];
 
 export function AnswerInput({ question, orientation, onSubmit }: AnswerInputProps) {
   switch (question.kind) {
     case "material":
-      return <NumberAnswer onSubmit={onSubmit} />;
-    case "squareContents":
-      return <PieceAnswer onSubmit={onSubmit} />;
+      return <NumberAnswer label="Material balance" placeholder="e.g. +3, 0, -2" onSubmit={onSubmit} />;
+    case "defenders":
+      return <NumberAnswer label="Number of defenders" placeholder="e.g. 2" onSubmit={onSubmit} />;
     case "pieceLocation":
       return <SquareAnswer orientation={orientation} onSubmit={onSubmit} />;
     case "moveLegality":
@@ -32,7 +31,13 @@ export function AnswerInput({ question, orientation, onSubmit }: AnswerInputProp
   }
 }
 
-function NumberAnswer({ onSubmit }: { onSubmit: (v: number) => void }) {
+interface NumberAnswerProps {
+  label: string;
+  placeholder: string;
+  onSubmit: (v: number) => void;
+}
+
+function NumberAnswer({ label, placeholder, onSubmit }: NumberAnswerProps) {
   const [value, setValue] = useState("");
   const parsed = Number(value.replace("−", "-"));
   const valid = value.trim() !== "" && Number.isInteger(parsed);
@@ -47,32 +52,13 @@ function NumberAnswer({ onSubmit }: { onSubmit: (v: number) => void }) {
       <input
         autoFocus
         inputMode="numeric"
-        placeholder="e.g. +3, 0, -2"
+        placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        aria-label="Material balance"
+        aria-label={label}
       />
       <button type="submit" className="primary" disabled={!valid}>Submit</button>
     </form>
-  );
-}
-
-function PieceAnswer({ onSubmit }: { onSubmit: (v: PieceCode | "empty") => void }) {
-  const row = (color: Color) =>
-    PIECE_ORDER.map((type) => {
-      const code = `${color}${type}` as PieceCode;
-      return (
-        <button key={code} className="choice choice--piece" title={describePiece(code)} onClick={() => onSubmit(code)}>
-          <span className={`piece piece--${color === "w" ? "white" : "black"}`}>{pieceGlyph(type)}</span>
-        </button>
-      );
-    });
-  return (
-    <div className="piece-answer">
-      <div className="piece-row">{row("w")}</div>
-      <div className="piece-row">{row("b")}</div>
-      <button className="choice" onClick={() => onSubmit("empty")}>Empty square</button>
-    </div>
   );
 }
 
@@ -97,8 +83,8 @@ export function formatAnswer(question: Question, value: AnswerValue): string {
   switch (question.kind) {
     case "material":
       return typeof value === "number" && value > 0 ? `+${value}` : String(value);
-    case "squareContents":
-      return describePiece(value as PieceCode | "empty");
+    case "defenders":
+      return String(value);
     case "pieceLocation":
       return value === "captured" ? "Captured" : String(value);
     case "moveLegality":

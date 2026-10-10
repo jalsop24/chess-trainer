@@ -4,24 +4,23 @@ export type Rng = () => number;
 
 export const PIECE_VALUES: Record<PieceSymbol, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
-/** A row of public/puzzles.json: [id, fen, uciMoves, rating]. See scripts/build-puzzles.mjs. */
-export type Puzzle = [id: string, fen: string, moves: string, rating: number];
+export type PuzzleGoal = "mate" | "crushing" | "advantage" | "equality";
 
-export type QuestionKind = "material" | "squareContents" | "pieceLocation" | "moveLegality";
+/** A row of public/puzzles.json: [id, fen, uciMoves, rating, goal]. See scripts/build-puzzles.mjs. */
+export type Puzzle = [id: string, fen: string, moves: string, rating: number, goal: PuzzleGoal];
+
+export type QuestionKind = "material" | "defenders" | "pieceLocation" | "moveLegality";
 
 export const QUESTION_KINDS: { kind: QuestionKind; label: string }[] = [
   { kind: "material", label: "Material balance" },
-  { kind: "squareContents", label: "What's on a square" },
+  { kind: "defenders", label: "How many defenders" },
   { kind: "pieceLocation", label: "Where did a piece go" },
   { kind: "moveLegality", label: "Is a move legal" },
 ];
 
-/** e.g. "wN", "bp" */
-export type PieceCode = `${Color}${PieceSymbol}`;
-
 export type Question =
   | { kind: "material"; prompt: string; answer: number; explanation: string }
-  | { kind: "squareContents"; prompt: string; square: Square; answer: PieceCode | "empty"; explanation: string }
+  | { kind: "defenders"; prompt: string; square: Square; answer: number; explanation: string }
   | { kind: "pieceLocation"; prompt: string; answer: Square | "captured"; explanation: string }
   | { kind: "moveLegality"; prompt: string; answer: boolean; explanation: string };
 
@@ -60,11 +59,6 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
 };
 
 const colorName = (c: Color) => (c === "w" ? "White" : "Black");
-
-export function describePiece(code: PieceCode | "empty"): string {
-  if (code === "empty") return "Empty";
-  return `${colorName(code[0] as Color)} ${PIECE_NAMES[code[1] as PieceSymbol]}`;
-}
 
 function pick<T>(items: T[], rng: Rng): T {
   return items[Math.floor(rng() * items.length)];
@@ -141,44 +135,88 @@ function trackPieces(startFen: string, moves: Move[]): TrackedPiece[] {
 // ---------------------------------------------------------------------------
 // Question builders. Each returns null when the line doesn't suit that kind.
 
-function materialQuestion(start: Chess, final: Chess, moves: Move[]): Question | null {
+/** Everything a question builder may look at. */
+interface LineContext {
+  start: Chess;
+  final: Chess;
+  /** The moves shown to the user. */
+  moves: Move[];
+  /** The puzzle's whole solution line, which may run past the shown moves. */
+  fullLine: Move[];
+  goal: PuzzleGoal;
+  /** The side solving the puzzle, i.e. the side the puzzle says is better. */
+  solver: Color;
+}
+
+const balanceOf = (chess: Chess) => {
+  const { w, b } = materialCount(chess);
+  return w - b;
+};
+
+/**
+ * Only asked when material tells the true story of the position: the puzzle
+ * isn't won by mate, the solver (who Lichess says ends up better) is ahead,
+ * and no captures are still pending later in the line.
+ */
+function materialQuestion({ start, final, moves, fullLine, goal, solver }: LineContext): Question | null {
+  if (goal !== "crushing" && goal !== "advantage") return null;
+  if (final.isCheckmate()) return null;
   if (!moves.some((m) => m.captured || m.promotion)) return null;
-  const before = materialCount(start);
+  const balance = balanceOf(final);
+  if (balance !== balanceOf(new Chess(fullLine[fullLine.length - 1].after))) return null;
+  if ((solver === "w" ? balance : -balance) <= 0) return null;
+
   const after = materialCount(final);
-  const balance = after.w - after.b;
   const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
   return {
     kind: "material",
     prompt:
       "After these moves, what is the material balance? Answer as White minus Black in points (P=1, N=B=3, R=5, Q=9).",
     answer: balance,
-    explanation: `White ${after.w} vs Black ${after.b}, so the balance is ${fmt(balance)} (it was ${fmt(before.w - before.b)} before the sequence).`,
+    explanation: `White ${after.w} vs Black ${after.b}, so the balance is ${fmt(balance)} (it was ${fmt(balanceOf(start))} before the sequence).`,
   };
 }
 
-function squareContentsQuestion(final: Chess, moves: Move[], rng: Rng): Question | null {
-  const squares = [...new Set(moves.flatMap((m) => [m.from, m.to]))];
-  // Squares a piece moved through are the interesting ones; skip ones that
-  // were vacated and stayed empty only half the time so answers vary.
-  const occupied = squares.filter((s) => final.get(s));
-  const pool = occupied.length > 0 && rng() < 0.7 ? occupied : squares;
-  const square = pick(pool, rng);
-  const piece = final.get(square);
-  const answer: PieceCode | "empty" = piece ? `${piece.color}${piece.type}` : "empty";
+/**
+ * Counts defenders of a piece in the final position. Only asks about pieces
+ * that moved during the line, or whose defenders changed, so the answer can't
+ * be read off the starting board.
+ */
+function defendersQuestion({ start, final, moves }: LineContext, rng: Rng): Question | null {
+  const touched = new Set(moves.flatMap((m) => [m.from, m.to]));
+  const candidates = final
+    .board()
+    .flat()
+    .filter((p) => p !== null && p.type !== "k")
+    .filter((p) => {
+      const defenders = final.attackers(p!.square, p!.color).length;
+      if (touched.has(p!.square)) return true;
+      return start.attackers(p!.square, p!.color).length !== defenders;
+    });
+  if (candidates.length === 0) return null;
+  const piece = pick(candidates, rng)!;
+  const defenders = final.attackers(piece.square, piece.color);
+  const name = `${colorName(piece.color).toLowerCase()} ${PIECE_NAMES[piece.type]}`;
+  const list = defenders.map((sq) => `the ${PIECE_NAMES[final.get(sq)!.type]} on ${sq}`);
+  const listed = list.length <= 1 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
   return {
-    kind: "squareContents",
-    prompt: `After these moves, what is on ${square}?`,
-    square,
-    answer,
-    explanation: answer === "empty" ? `${square} is empty.` : `There is a ${describePiece(answer).toLowerCase()} on ${square}.`,
+    kind: "defenders",
+    prompt: `After these moves, how many pieces defend the ${name} on ${piece.square}? (Count every ${colorName(piece.color)} piece that attacks ${piece.square}, including the king; ignore pins.)`,
+    square: piece.square,
+    answer: defenders.length,
+    explanation:
+      defenders.length === 0
+        ? `Nothing defends the ${name} on ${piece.square}.`
+        : `The ${name} on ${piece.square} is defended by ${listed}.`,
   };
 }
 
 function pieceLocationQuestion(startFen: string, moves: Move[], rng: Rng): Question | null {
   const pieces = trackPieces(startFen, moves);
-  const interesting = pieces.filter((p) => p.timesMoved >= 2 || (p.square === null && p.type !== "p"));
-  const fallback = pieces.filter((p) => p.timesMoved >= 1);
-  const pool = interesting.length > 0 ? interesting : moves.length >= 4 ? fallback : [];
+  // A piece's fate after a single step can be read off the notation ("Nd2",
+  // or "gxf3" for one captured where it stood). It takes a second step to
+  // need visualising: moving twice, or moving and then being captured.
+  const pool = pieces.filter((p) => p.timesMoved >= 2 || (p.square === null && p.timesMoved >= 1));
   if (pool.length === 0) return null;
   const piece = pick(pool, rng);
   const name = `${colorName(piece.color)} ${PIECE_NAMES[piece.type]}`;
@@ -230,7 +268,7 @@ function illegalReason(final: Chess, from: Square, to: Square): string {
   return `it would leave ${colorName(piece.color)}'s king in check.`;
 }
 
-function moveLegalityQuestion(start: Chess, final: Chess, moves: Move[], rng: Rng): Question | null {
+function moveLegalityQuestion({ start, final, moves }: LineContext, rng: Rng): Question | null {
   if (final.isGameOver()) return null;
   const side = final.turn();
   const simple = (m: Move) => !m.promotion && !m.isKingsideCastle() && !m.isQueensideCastle();
@@ -275,23 +313,16 @@ function moveLegalityQuestion(start: Chess, final: Chess, moves: Move[], rng: Rn
 
 // ---------------------------------------------------------------------------
 
-function buildQuestion(
-  kind: QuestionKind,
-  startFen: string,
-  moves: Move[],
-  rng: Rng,
-): Question | null {
-  const start = new Chess(startFen);
-  const final = new Chess(moves[moves.length - 1].after);
+function buildQuestion(kind: QuestionKind, ctx: LineContext, rng: Rng): Question | null {
   switch (kind) {
     case "material":
-      return materialQuestion(start, final, moves);
-    case "squareContents":
-      return squareContentsQuestion(final, moves, rng);
+      return materialQuestion(ctx);
+    case "defenders":
+      return defendersQuestion(ctx, rng);
     case "pieceLocation":
-      return pieceLocationQuestion(startFen, moves, rng);
+      return pieceLocationQuestion(ctx.start.fen(), ctx.moves, rng);
     case "moveLegality":
-      return moveLegalityQuestion(start, final, moves, rng);
+      return moveLegalityQuestion(ctx, rng);
   }
 }
 
@@ -310,16 +341,28 @@ export function generateExercise({ puzzles, plies, kinds, rng = Math.random }: G
   if (kinds.length === 0) throw new Error("Select at least one question type");
   const pool = puzzles.filter(([, , moves]) => moves.split(" ").length >= plies);
   if (pool.length === 0) throw new Error(`No puzzles with a line of ${plies} half-moves`);
-  for (let attempt = 0; attempt < 50; attempt++) {
-    const [puzzleId, startFen, uci, rating] = pick(pool, rng);
-    const moves = playUci(startFen, uci.split(" ").slice(0, plies));
+  // Some kinds suit only a minority of puzzles (material: ~1 in 4), and
+  // attempts take well under a millisecond, so try plenty.
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const [puzzleId, startFen, uci, rating, goal] = pick(pool, rng);
+    const fullLine = playUci(startFen, uci.split(" "));
+    const moves = fullLine.slice(0, plies);
+    const solver: Color = startFen.split(" ")[1] === "w" ? "b" : "w";
+    const ctx: LineContext = {
+      start: new Chess(startFen),
+      final: new Chess(moves[moves.length - 1].after),
+      moves,
+      fullLine,
+      goal,
+      solver,
+    };
     for (const kind of shuffle(kinds, rng)) {
-      const question = buildQuestion(kind, startFen, moves, rng);
+      const question = buildQuestion(kind, ctx, rng);
       if (!question) continue;
       return {
         puzzleId,
         rating,
-        orientation: startFen.split(" ")[1] === "w" ? "b" : "w",
+        orientation: solver,
         startFen,
         moves: moves.map((m) => ({ san: m.san, from: m.from, to: m.to, fenAfter: m.after })),
         finalFen: moves[moves.length - 1].after,

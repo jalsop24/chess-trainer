@@ -50,7 +50,12 @@ type Phase =
   | { name: "revealed"; exercise: Exercise; given: AnswerValue; correct: boolean };
 
 export default function App() {
-  const [settings, setSettings] = useState<Settings>(() => load("settings", DEFAULT_SETTINGS));
+  const [settings, setSettings] = useState<Settings>(() => {
+    const saved = load("settings", DEFAULT_SETTINGS);
+    // Drop question kinds saved by older versions that no longer exist.
+    const kinds = saved.kinds.filter((k) => QUESTION_KINDS.some((q) => q.kind === k));
+    return { ...saved, kinds: kinds.length > 0 ? kinds : DEFAULT_SETTINGS.kinds };
+  });
   const [stats, setStats] = useState<Stats>(() => load("stats", EMPTY_STATS));
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
   const [step, setStep] = useState(0);

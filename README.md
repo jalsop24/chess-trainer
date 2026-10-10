@@ -47,10 +47,18 @@ puzzle and the best continuation.
    for the side solving the puzzle.
 3. **Ask a question** about the position after the sequence
    (`src/lib/exercise.ts`):
-   - **Material balance:** White minus Black, in points.
-   - **What's on a square:** a piece or "empty".
-   - **Where did a piece go:** a square or "captured".
+   - **Material balance:** White minus Black, in points. Only asked when
+     material reflects who is better: the puzzle isn't won by mate, the solving
+     side is ahead, and no captures are pending later in the line.
+   - **How many defenders:** how many pieces defend a piece that moved, or
+     whose defenders changed, during the line.
+   - **Where did a piece go:** a square or "captured". Only asked about pieces
+     that moved twice, or moved and were then captured, since one move can be
+     read straight off the notation.
    - **Is a move legal:** yes or no.
+
+   Questions are chosen so the answer can't be read off the move list or the
+   starting board alone.
 
 ### Regenerating the puzzle data
 

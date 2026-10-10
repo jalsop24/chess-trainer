@@ -6,8 +6,10 @@
 // The CSV is sorted by puzzle ID, which is effectively random, so we take the
 // first well-rated puzzles in each length bucket and stop reading early.
 //
-// Each output row is [id, fen, uciMoves, rating]. The FEN is the game position
-// before the opponent's move; the moves are that move followed by the solution.
+// Each output row is [id, fen, uciMoves, rating, goal]. The FEN is the game
+// position before the opponent's move; the moves are that move followed by the
+// solution. The goal is the puzzle's outcome theme: "mate", "crushing",
+// "advantage" or "equality" (Lichess tags every puzzle with exactly one).
 
 import { createInterface } from "node:readline";
 
@@ -20,6 +22,7 @@ const MAX_RATING_DEVIATION = 90;
 
 const FEN_RE = /^[1-8pnbrqkPNBRQK/]+ [wb] (-|[KQkq]+) (-|[a-h][36]) \d+ \d+$/;
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+const GOALS = ["mate", "crushing", "advantage", "equality"];
 
 const bucketOf = (n) => Math.min(n, 10);
 const counts = Object.fromEntries(Object.keys(QUOTAS).map((k) => [k, 0]));
@@ -54,8 +57,10 @@ rl.on("line", (line) => {
   if (Number(get("NbPlays")) < MIN_PLAYS) return;
   if (Number(get("RatingDeviation")) > MAX_RATING_DEVIATION) return;
   if (!FEN_RE.test(fen) || !moves.every((m) => UCI_RE.test(m))) return;
+  const goal = GOALS.find((g) => get("Themes").split(" ").includes(g));
+  if (!goal) return;
 
-  rows.push([get("PuzzleId"), fen, moves.join(" "), Number(get("Rating"))]);
+  rows.push([get("PuzzleId"), fen, moves.join(" "), Number(get("Rating")), goal]);
   counts[bucket]++;
   if (done()) finish();
 });
