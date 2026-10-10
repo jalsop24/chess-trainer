@@ -5,10 +5,6 @@ and a sequence of moves, then asks a question about the resulting position,
 which you answer without moving the pieces. For example: *"Nxe4 dxe4 — what is
 the material balance now?"*
 
-> **Status:** the exercise generator (positions, move sequences, questions) is
-> built and tested. The browser UI is not built yet, so `npm run dev` currently
-> serves an empty page.
-
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20 or newer (developed on Node 22)
@@ -20,9 +16,15 @@ the material balance now?"*
 # Install dependencies
 npm install
 
-# Start the dev server (http://localhost:5173)
+# Start the dev server
 npm run dev
 ```
+
+Then open http://localhost:5173. Each exercise shows the start position, a
+move sequence and a question. After you answer, you can replay the line on the
+board with the ◀ ▶ buttons or the arrow keys, and press Enter for the next
+exercise. Use **Settings** to change the sequence length (2–10 half-moves) and
+choose which question types appear. Your score is saved in the browser.
 
 Other commands:
 
@@ -46,7 +48,8 @@ Other commands:
    - **Where did a piece go:** a square or "captured".
    - **Is a move legal:** yes or no.
 
-Generating an exercise takes about 3 seconds, mostly in the engine search.
+Generation runs in a Web Worker (`src/lib/generator.worker.ts`), and the next
+exercise is prepared while you work on the current one.
 
 ## Tech stack
 
