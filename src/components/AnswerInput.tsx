@@ -23,9 +23,9 @@ export function AnswerInput({ question, orientation, onSubmit }: AnswerInputProp
       return <SquareAnswer orientation={orientation} onSubmit={onSubmit} />;
     case "moveLegality":
       return (
-        <div className="choices">
-          <button className="choice" onClick={() => onSubmit(true)}>Yes</button>
-          <button className="choice" onClick={() => onSubmit(false)}>No</button>
+        <div className="button-row">
+          <button className="button" onClick={() => onSubmit(true)}>Yes</button>
+          <button className="button" onClick={() => onSubmit(false)}>No</button>
         </div>
       );
   }
@@ -57,7 +57,7 @@ function NumberAnswer({ label, placeholder, onSubmit }: NumberAnswerProps) {
         onChange={(e) => setValue(e.target.value)}
         aria-label={label}
       />
-      <button type="submit" className="primary" disabled={!valid}>Submit</button>
+      <button type="submit" className="button button--primary" disabled={!valid}>Submit</button>
     </form>
   );
 }
@@ -69,11 +69,11 @@ function SquareAnswer({ orientation, onSubmit }: { orientation: Color; onSubmit:
       <div className="mini-board">
         <Board fen={EMPTY_FEN} orientation={orientation} hidePieces selected={selected} onSquareClick={setSelected} />
       </div>
-      <div className="choices">
-        <button className="primary" disabled={!selected} onClick={() => selected && onSubmit(selected)}>
+      <div className="button-row">
+        <button className="button button--primary" disabled={!selected} onClick={() => selected && onSubmit(selected)}>
           {selected ? `Submit ${selected}` : "Pick a square"}
         </button>
-        <button className="choice" onClick={() => onSubmit("captured")}>Captured</button>
+        <button className="button" onClick={() => onSubmit("captured")}>Captured</button>
       </div>
     </div>
   );

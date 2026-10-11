@@ -1,15 +1,11 @@
-import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
+import { Chess, type Color, type Square } from "chess.js";
 
-// Filled glyphs for both colours (styled via CSS); ︎ stops iOS rendering
-// the pawn as an emoji.
-const GLYPHS: Record<PieceSymbol, string> = {
-  k: "♚︎",
-  q: "♛︎",
-  r: "♜︎",
-  b: "♝︎",
-  n: "♞︎",
-  p: "♟︎",
-};
+// cburnett pieces (see src/assets/pieces/README.md), keyed like "wK", "bN".
+const PIECE_URLS = Object.fromEntries(
+  Object.entries(import.meta.glob<string>("../assets/pieces/*.svg", { eager: true, query: "?url", import: "default" })).map(
+    ([path, url]) => [path.match(/(\w+)\.svg$/)![1], url],
+  ),
+);
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
@@ -18,6 +14,7 @@ interface BoardProps {
   orientation: Color;
   /** Draw an empty board (for "click the square" answers). */
   hidePieces?: boolean;
+  /** Squares of the last move played, tinted. */
   highlight?: Square[];
   selected?: Square | null;
   onSquareClick?: (square: Square) => void;
@@ -44,16 +41,17 @@ export function Board({ fen, orientation, hidePieces, highlight = [], selected, 
           ]
             .filter(Boolean)
             .join(" ");
+          const label = piece ? `${square}, ${piece.color === "w" ? "white" : "black"} ${piece.type}` : square;
           return (
             <div
               key={square}
               className={classes}
               role="gridcell"
-              aria-label={piece ? `${square} ${piece.color === "w" ? "white" : "black"} ${piece.type}` : square}
+              aria-label={label}
               onClick={onSquareClick ? () => onSquareClick(square) : undefined}
             >
               {piece && (
-                <span className={`piece piece--${piece.color === "w" ? "white" : "black"}`}>{GLYPHS[piece.type]}</span>
+                <img className="piece" src={PIECE_URLS[`${piece.color}${piece.type.toUpperCase()}`]} alt="" draggable={false} />
               )}
               {fi === 0 && <span className="coord coord--rank">{rank}</span>}
               {ri === 7 && <span className="coord coord--file">{file}</span>}

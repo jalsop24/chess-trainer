@@ -79,3 +79,6 @@ part of the roughly 300 MB file. Quotas and quality filters are at the top of
 
 Vite, React and TypeScript, with [chess.js](https://github.com/jhlywa/chess.js)
 for chess rules and notation, and Vitest for tests.
+
+Piece images are the "cburnett" set by Colin M.L. Burnett, used under the BSD
+license; see `src/assets/pieces/README.md`.

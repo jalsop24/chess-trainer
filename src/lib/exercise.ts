@@ -18,11 +18,12 @@ export const QUESTION_KINDS: { kind: QuestionKind; label: string }[] = [
   { kind: "moveLegality", label: "Is a move legal" },
 ];
 
+/** Every question has a short `prompt` and an optional smaller `hint` with the rules. */
 export type Question =
-  | { kind: "material"; prompt: string; answer: number; explanation: string }
-  | { kind: "defenders"; prompt: string; square: Square; answer: number; explanation: string }
-  | { kind: "pieceLocation"; prompt: string; answer: Square | "captured"; explanation: string }
-  | { kind: "moveLegality"; prompt: string; answer: boolean; explanation: string };
+  | { kind: "material"; prompt: string; hint?: string; answer: number; explanation: string }
+  | { kind: "defenders"; prompt: string; hint?: string; square: Square; answer: number; explanation: string }
+  | { kind: "pieceLocation"; prompt: string; hint?: string; answer: Square | "captured"; explanation: string }
+  | { kind: "moveLegality"; prompt: string; hint?: string; answer: boolean; explanation: string };
 
 export interface SequenceMove {
   san: string;
@@ -81,19 +82,33 @@ export function materialCount(chess: Chess): { w: number; b: number } {
   return total;
 }
 
-/** Formats moves with numbering, e.g. "14. Nxe4 dxe4 15. Qxe4" or "14... dxe4". */
-export function formatMoves(startFen: string, sans: string[]): string[] {
+export interface MoveRow {
+  number: number;
+  /** Index into the sequence of White's move in this row, or null if absent. */
+  white: number | null;
+  black: number | null;
+}
+
+/**
+ * Groups a sequence into numbered rows for a two-column move list. A line that
+ * starts with Black gets an empty White slot in its first row ("14. … dxe4").
+ */
+export function moveRows(startFen: string, plies: number): MoveRow[] {
   const [, turn, , , , fullmove] = startFen.split(" ");
-  let moveNo = Number(fullmove);
+  const rows: MoveRow[] = [];
+  let number = Number(fullmove);
   let white = turn === "w";
-  return sans.map((san, i) => {
-    let label: string;
-    if (white) label = `${moveNo}. ${san}`;
-    else label = i === 0 ? `${moveNo}... ${san}` : san;
-    if (!white) moveNo++;
+  for (let i = 0; i < plies; i++) {
+    if (white || rows.length === 0) rows.push({ number, white: null, black: null });
+    const row = rows[rows.length - 1];
+    if (white) row.white = i;
+    else {
+      row.black = i;
+      number++;
+    }
     white = !white;
-    return label;
-  });
+  }
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,8 +185,8 @@ function materialQuestion({ start, final, moves, fullLine, goal, solver }: LineC
   const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
   return {
     kind: "material",
-    prompt:
-      "After these moves, what is the material balance? Answer as White minus Black in points (P=1, N=B=3, R=5, Q=9).",
+    prompt: "After these moves, what is the material balance?",
+    hint: "White minus Black, in points: P=1, N=B=3, R=5, Q=9.",
     answer: balance,
     explanation: `White ${after.w} vs Black ${after.b}, so the balance is ${fmt(balance)} (it was ${fmt(balanceOf(start))} before the sequence).`,
   };
@@ -201,7 +216,8 @@ function defendersQuestion({ start, final, moves }: LineContext, rng: Rng): Ques
   const listed = list.length <= 1 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
   return {
     kind: "defenders",
-    prompt: `After these moves, how many pieces defend the ${name} on ${piece.square}? (Count every ${colorName(piece.color)} piece that attacks ${piece.square}, including the king; ignore pins.)`,
+    prompt: `After these moves, how many pieces defend the ${name} on ${piece.square}?`,
+    hint: `Count every ${colorName(piece.color)} piece that attacks ${piece.square}, including the king. Ignore pins.`,
     square: piece.square,
     answer: defenders.length,
     explanation:
@@ -222,7 +238,8 @@ function pieceLocationQuestion(startFen: string, moves: Move[], rng: Rng): Quest
   const name = `${colorName(piece.color)} ${PIECE_NAMES[piece.type]}`;
   return {
     kind: "pieceLocation",
-    prompt: `Where is the ${name} that started on ${piece.start} now? (Click its square, or choose "Captured".)`,
+    prompt: `Where is the ${name} that started on ${piece.start} now?`,
+    hint: "Click its square, or choose Captured.",
     answer: piece.square ?? "captured",
     explanation: piece.square
       ? `The ${name} from ${piece.start} ends up on ${piece.square}.`

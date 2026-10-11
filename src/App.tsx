@@ -4,7 +4,7 @@ import { Board } from "./components/Board";
 import { AnswerInput, formatAnswer, type AnswerValue } from "./components/AnswerInput";
 import {
   QUESTION_KINDS,
-  formatMoves,
+  moveRows,
   generateExercise,
   type Exercise,
   type Puzzle,
@@ -125,7 +125,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") setStep((s) => Math.max(0, s - 1));
       else if (e.key === "ArrowRight") setStep((s) => Math.min(total, s + 1));
-      else if (e.key === "Enter") nextExercise(settings);
+      // A focused button handles Enter itself; don't advance twice.
+      else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement)) nextExercise(settings);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -133,7 +134,7 @@ export default function App() {
 
   const exercise = phase.name === "asking" || phase.name === "revealed" ? phase.exercise : null;
   const orientation: Color = exercise?.orientation ?? "w";
-  const toMove = exercise?.startFen.split(" ")[1] === "b" ? "Black" : "White";
+  const toMove: Color = exercise?.startFen.split(" ")[1] === "b" ? "b" : "w";
 
   let boardFen = exercise?.startFen ?? "8/8/8/8/8/8/8/8 w - - 0 1";
   let highlight: Square[] = [];
@@ -143,33 +144,57 @@ export default function App() {
     highlight = [m.from, m.to];
   }
 
+  const total = exercise?.moves.length ?? 0;
+  const revealed = phase.name === "revealed";
+
   return (
     <div className="app">
       <header className="header">
-        <h1>Visualisation Trainer</h1>
-        <div className="stats" aria-label="Score">
-          <span><strong>{stats.correct}</strong>/{stats.answered} correct</span>
-          <span>Streak <strong>{stats.streak}</strong></span>
-          <span>Best <strong>{stats.best}</strong></span>
-          <button className="link" onClick={() => setStats(EMPTY_STATS)}>Reset</button>
+        <div className="brand">
+          <BrandMark />
+          <h1>Visualisation Trainer</h1>
         </div>
+        <dl className="stats" aria-label="Score">
+          <div>
+            <dt>Correct</dt>
+            <dd>
+              {stats.correct}
+              <span className="stats__of">/{stats.answered}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Streak</dt>
+            <dd>{stats.streak}</dd>
+          </div>
+          <div>
+            <dt>Best</dt>
+            <dd>{stats.best}</dd>
+          </div>
+          <button className="ghost-button" onClick={() => setStats(EMPTY_STATS)} title="Reset score">
+            Reset
+          </button>
+        </dl>
       </header>
 
       <main className="layout">
         <section className="board-area">
-          <div className={`board-wrap${phase.name === "loading" ? " board-wrap--loading" : ""}`}>
+          <div className={`board-frame${phase.name === "loading" ? " board-frame--loading" : ""}`}>
             <Board fen={boardFen} orientation={orientation} highlight={highlight} />
             {phase.name === "loading" && <div className="overlay">Loading puzzles…</div>}
           </div>
-          {exercise && phase.name === "revealed" && (
-            <div className="stepper">
-              <button onClick={() => setStep(0)} disabled={step === 0} aria-label="Start position">⏮</button>
-              <button onClick={() => setStep((s) => s - 1)} disabled={step === 0} aria-label="Previous move">◀</button>
-              <span>{step === 0 ? "Start" : `After ${step}/${exercise.moves.length}`}</span>
-              <button onClick={() => setStep((s) => s + 1)} disabled={step === exercise.moves.length} aria-label="Next move">▶</button>
-              <button onClick={() => setStep(exercise.moves.length)} disabled={step === exercise.moves.length} aria-label="Final position">⏭</button>
-            </div>
-          )}
+          <div className="board-footer">
+            {revealed ? (
+              <div className="stepper" role="group" aria-label="Replay the line">
+                <IconButton label="Start position" disabled={step === 0} onClick={() => setStep(0)} icon="first" />
+                <IconButton label="Previous move" disabled={step === 0} onClick={() => setStep((s) => s - 1)} icon="prev" />
+                <span className="stepper__label">{step === 0 ? "Start position" : `Move ${step} of ${total}`}</span>
+                <IconButton label="Next move" disabled={step === total} onClick={() => setStep((s) => s + 1)} icon="next" />
+                <IconButton label="Final position" disabled={step === total} onClick={() => setStep(total)} icon="last" />
+              </div>
+            ) : (
+              exercise && <p className="board-caption">Starting position · play the line in your head</p>
+            )}
+          </div>
         </section>
 
         <section className="panel">
@@ -177,7 +202,7 @@ export default function App() {
             <div className="card">
               <p className="error">{phase.message}</p>
               <button
-                className="primary"
+                className="button button--primary"
                 onClick={() => (puzzlesRef.current ? nextExercise(settings) : location.reload())}
               >
                 Try again
@@ -186,93 +211,182 @@ export default function App() {
           )}
 
           {exercise && (
-            <>
-              <div className="card">
-                <div className="meta">
-                  {toMove} to move · Lichess puzzle rated {exercise.rating}
-                  {phase.name === "revealed" && (
+            <div className="card exercise">
+              <div className="exercise__meta">
+                <span className={`turn turn--${toMove}`}>
+                  <span className="turn__dot" aria-hidden />
+                  {toMove === "w" ? "White" : "Black"} to move
+                </span>
+                <span className="exercise__rating">
+                  Puzzle rating {exercise.rating}
+                  {revealed && (
                     <>
                       {" · "}
                       <a href={`https://lichess.org/training/${exercise.puzzleId}`} target="_blank" rel="noreferrer">
-                        Open on Lichess
+                        Lichess ↗
                       </a>
                     </>
                   )}
-                </div>
-                <ol className="moves">
-                  {formatMoves(exercise.startFen, exercise.moves.map((m) => m.san)).map((label, i) => (
-                    <li key={i}>
-                      {phase.name === "revealed" ? (
-                        <button className={`move${step === i + 1 ? " move--current" : ""}`} onClick={() => setStep(i + 1)}>
-                          {label}
-                        </button>
-                      ) : (
-                        <span className="move">{label}</span>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-                <p className="hint">
-                  {phase.name === "asking"
-                    ? "Play these moves in your head. Don't move the pieces!"
-                    : "Click a move or use ← → to replay the line."}
-                </p>
+                </span>
               </div>
 
-              <div className="card">
-                <p className="prompt">{exercise.question.prompt}</p>
+              <table className="moves">
+                <tbody>
+                  {moveRows(exercise.startFen, total).map((row) => (
+                    <tr key={row.number}>
+                      <th scope="row">{row.number}.</th>
+                      {[row.white, row.black].map((ply, col) => (
+                        <td key={col}>
+                          {ply === null ? (
+                            row.white === null && col === 0 ? <span className="move move--empty">…</span> : null
+                          ) : revealed ? (
+                            <button
+                              className={`move${step === ply + 1 ? " move--current" : ""}`}
+                              onClick={() => setStep(ply + 1)}
+                            >
+                              {exercise.moves[ply].san}
+                            </button>
+                          ) : (
+                            <span className="move">{exercise.moves[ply].san}</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="question">
+                <h2 className="question__label">Question</h2>
+                <p className="question__prompt">{exercise.question.prompt}</p>
+                {exercise.question.hint && <p className="question__hint">{exercise.question.hint}</p>}
                 {phase.name === "asking" && (
                   <AnswerInput key={exercise.startFen} question={exercise.question} orientation={orientation} onSubmit={submit} />
                 )}
                 {phase.name === "revealed" && (
-                  <div className={`result ${phase.correct ? "result--correct" : "result--wrong"}`}>
-                    <p className="result-title">
-                      {phase.correct ? "Correct!" : `Not quite: you answered ${formatAnswer(exercise.question, phase.given)}.`}
-                    </p>
-                    <p>{exercise.question.explanation}</p>
-                    <button className="primary" autoFocus onClick={() => nextExercise(settings)}>
-                      Next exercise ↵
-                    </button>
+                  <div className={`result ${phase.correct ? "result--correct" : "result--wrong"}`} role="status">
+                    <div className="result__head">
+                      <span className="result__icon" aria-hidden>
+                        {phase.correct ? "✓" : "✕"}
+                      </span>
+                      <span className="result__title">
+                        {phase.correct ? "Correct" : `Not quite (you said ${formatAnswer(exercise.question, phase.given)})`}
+                      </span>
+                    </div>
+                    <p className="result__explanation">{exercise.question.explanation}</p>
                   </div>
                 )}
               </div>
-            </>
+
+              {revealed && (
+                <div className="exercise__actions">
+                  <button className="button button--primary" autoFocus onClick={() => nextExercise(settings)}>
+                    Next exercise
+                  </button>
+                  <span className="kbd-hint">
+                    <kbd>Enter</kbd> next · <kbd>←</kbd>
+                    <kbd>→</kbd> replay
+                  </span>
+                </div>
+              )}
+            </div>
           )}
 
           <details className="card settings">
-            <summary>Settings</summary>
-            <label className="field">
-              <span>Sequence length: <strong>{settings.plies}</strong> half-moves</span>
-              <input
-                type="range"
-                min={2}
-                max={10}
-                value={settings.plies}
-                onChange={(e) => updateSettings({ ...settings, plies: Number(e.target.value) })}
-              />
-            </label>
-            <fieldset className="field">
-              <legend>Question types</legend>
-              {QUESTION_KINDS.map(({ kind, label }) => (
-                <label key={kind} className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={settings.kinds.includes(kind)}
-                    onChange={(e) =>
-                      updateSettings({
-                        ...settings,
-                        kinds: e.target.checked ? [...settings.kinds, kind] : settings.kinds.filter((k) => k !== kind),
-                      })
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
+            <summary>
+              Settings
+              <svg className="settings__chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </summary>
+            <div className="field">
+              <span className="field__label" id="length-label">
+                Sequence length <span className="field__hint">(half-moves)</span>
+              </span>
+              <div className="segmented" role="radiogroup" aria-labelledby="length-label">
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <button
+                    key={n}
+                    role="radio"
+                    aria-checked={settings.plies === n}
+                    className={settings.plies === n ? "is-active" : ""}
+                    onClick={() => updateSettings({ ...settings, plies: n })}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <span className="field__label">Question types</span>
+              <div className="chips">
+                {QUESTION_KINDS.map(({ kind, label }) => {
+                  const on = settings.kinds.includes(kind);
+                  return (
+                    <button
+                      key={kind}
+                      className={`chip${on ? " is-active" : ""}`}
+                      aria-pressed={on}
+                      onClick={() =>
+                        updateSettings({
+                          ...settings,
+                          kinds: on ? settings.kinds.filter((k) => k !== kind) : [...settings.kinds, kind],
+                        })
+                      }
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
               {settings.kinds.length === 0 && <p className="error">Pick at least one question type.</p>}
-            </fieldset>
+            </div>
           </details>
         </section>
       </main>
+
+      <footer className="footer">
+        Puzzles from the <a href="https://database.lichess.org/#puzzles">Lichess puzzle database</a> (CC0) · Pieces by
+        Colin M.L. Burnett
+      </footer>
     </div>
+  );
+}
+
+const ICON_PATHS = {
+  first: "M7 6v12M18 6l-8 6 8 6z",
+  prev: "M16 6l-8 6 8 6z",
+  next: "M8 6l8 6-8 6z",
+  last: "M17 6v12M6 6l8 6-8 6z",
+};
+
+function IconButton({
+  label,
+  icon,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  icon: keyof typeof ICON_PATHS;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button className="icon-button" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+        <path d={ICON_PATHS[icon]} fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+/** A 2x2 checker mark used as the app logo. */
+function BrandMark() {
+  return (
+    <svg className="brand__mark" viewBox="0 0 24 24" width="28" height="28" aria-hidden>
+      <rect width="24" height="24" rx="6" fill="var(--sq-dark)" />
+      <rect x="4" y="4" width="8" height="8" rx="1.5" fill="var(--sq-light)" />
+      <rect x="12" y="12" width="8" height="8" rx="1.5" fill="var(--sq-light)" />
+    </svg>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { QUESTION_KINDS, formatMoves, generateExercise, materialCount, playUci, type Puzzle } from "./exercise";
+import { QUESTION_KINDS, generateExercise, moveRows, materialCount, playUci, type Puzzle } from "./exercise";
 import puzzleData from "../../public/puzzles.json";
 
 const puzzles = puzzleData as unknown as Puzzle[];
@@ -31,15 +31,21 @@ describe("puzzle data", () => {
   });
 });
 
-describe("formatMoves", () => {
+describe("moveRows", () => {
   it("numbers a line starting with White", () => {
     const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 12";
-    expect(formatMoves(fen, ["Nxe4", "dxe4", "Qxe4"])).toEqual(["12. Nxe4", "dxe4", "13. Qxe4"]);
+    expect(moveRows(fen, 3)).toEqual([
+      { number: 12, white: 0, black: 1 },
+      { number: 13, white: 2, black: null },
+    ]);
   });
 
   it("numbers a line starting with Black", () => {
     const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 12";
-    expect(formatMoves(fen, ["dxe4", "Qxe4"])).toEqual(["12... dxe4", "13. Qxe4"]);
+    expect(moveRows(fen, 2)).toEqual([
+      { number: 12, white: null, black: 0 },
+      { number: 13, white: 1, black: null },
+    ]);
   });
 });
 
