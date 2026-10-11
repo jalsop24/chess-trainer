@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Color, Square } from "chess.js";
 import { Board } from "./components/Board";
-import { AnswerInput, formatAnswer, type AnswerValue } from "./components/AnswerInput";
+import { AnswerInput, MaterialComparison, formatAnswer } from "./components/AnswerInput";
 import {
   QUESTION_KINDS,
+  checkAnswer,
   moveRows,
   generateExercise,
+  type AnswerValue,
   type Exercise,
+  type MaterialCounts,
   type Puzzle,
   type QuestionKind,
 } from "./lib/exercise";
@@ -104,7 +107,7 @@ export default function App() {
 
   const submit = (given: AnswerValue) => {
     if (phase.name !== "asking") return;
-    const correct = given === phase.exercise.question.answer;
+    const correct = checkAnswer(phase.exercise.question, given);
     setPhase({ name: "revealed", exercise: phase.exercise, given, correct });
     setStep(phase.exercise.moves.length);
     setStats((st) => {
@@ -270,10 +273,17 @@ export default function App() {
                         {phase.correct ? "✓" : "✕"}
                       </span>
                       <span className="result__title">
-                        {phase.correct ? "Correct" : `Not quite (you said ${formatAnswer(exercise.question, phase.given)})`}
+                        {phase.correct
+                          ? "Correct"
+                          : exercise.question.kind === "material"
+                            ? "Not quite"
+                            : `Not quite (you said ${formatAnswer(exercise.question, phase.given)})`}
                       </span>
                     </div>
                     <p className="result__explanation">{exercise.question.explanation}</p>
+                    {exercise.question.kind === "material" && (
+                      <MaterialComparison answer={exercise.question.answer} given={phase.given as MaterialCounts} />
+                    )}
                   </div>
                 )}
               </div>

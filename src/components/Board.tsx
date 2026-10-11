@@ -1,11 +1,5 @@
 import { Chess, type Color, type Square } from "chess.js";
-
-// cburnett pieces (see src/assets/pieces/README.md), keyed like "wK", "bN".
-const PIECE_URLS = Object.fromEntries(
-  Object.entries(import.meta.glob<string>("../assets/pieces/*.svg", { eager: true, query: "?url", import: "default" })).map(
-    ([path, url]) => [path.match(/(\w+)\.svg$/)![1], url],
-  ),
-);
+import { pieceUrl } from "./pieces";
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
@@ -51,7 +45,7 @@ export function Board({ fen, orientation, hidePieces, highlight = [], selected, 
               onClick={onSquareClick ? () => onSquareClick(square) : undefined}
             >
               {piece && (
-                <img className="piece" src={PIECE_URLS[`${piece.color}${piece.type.toUpperCase()}`]} alt="" draggable={false} />
+                <img className="piece" src={pieceUrl(piece.color, piece.type)} alt="" draggable={false} />
               )}
               {fi === 0 && <span className="coord coord--rank">{rank}</span>}
               {ri === 7 && <span className="coord coord--file">{file}</span>}

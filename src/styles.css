@@ -600,6 +600,132 @@ kbd {
   box-shadow: var(--shadow-board);
 }
 
+/* Material counters: one row of five per side */
+.material-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.material-side__label {
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.material-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+
+.counter--changed {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.counter__piece {
+  width: 34px;
+  height: 34px;
+}
+
+.counter__value {
+  position: relative;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.counter__diff {
+  position: absolute;
+  left: calc(100% + 3px);
+  top: 1px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.counter__buttons {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.counter__buttons button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.counter__buttons button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.counter__buttons button:disabled {
+  opacity: 0.35;
+}
+
+.material-answer .button-row {
+  margin-top: 4px;
+}
+
+.material-answer--result {
+  margin: 12px 0 0 34px;
+}
+
+.material-answer--result .counter {
+  background: var(--surface);
+}
+
+.counter--wrong {
+  border-color: var(--wrong);
+}
+
+.counter__yours {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--wrong);
+  text-decoration: line-through;
+}
+
+@media (max-width: 480px) {
+  .material-answer--result {
+    margin-left: 0;
+  }
+
+  .counter__piece {
+    width: 28px;
+    height: 28px;
+  }
+}
+
 /* ---------- Result ---------- */
 
 .result {

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { QUESTION_KINDS, generateExercise, moveRows, materialCount, playUci, type Puzzle } from "./exercise";
+import {
+  QUESTION_KINDS,
+  checkAnswer,
+  generateExercise,
+  materialCount,
+  moveRows,
+  pieceCounts,
+  playUci,
+  type Puzzle,
+} from "./exercise";
 import puzzleData from "../../public/puzzles.json";
 
 const puzzles = puzzleData as unknown as Puzzle[];
@@ -66,12 +75,17 @@ describe("generateExercise", () => {
         const q = ex.question;
         const puzzle = puzzles.find(([id]) => id === ex.puzzleId)!;
         if (q.kind === "material") {
-          const { w, b } = materialCount(chess);
-          expect(q.answer).toBe(w - b);
+          expect(q.start).toEqual(pieceCounts(new Chess(ex.startFen)));
+          expect(q.answer).toEqual(pieceCounts(chess));
+          expect(q.answer).not.toEqual(q.start);
           // Material only tells the story when there's no mate and the solver is ahead.
+          const { w, b } = materialCount(chess);
           expect(["crushing", "advantage"]).toContain(puzzle[4]);
           expect(chess.isCheckmate()).toBe(false);
-          expect(ex.orientation === "w" ? q.answer : -q.answer).toBeGreaterThan(0);
+          expect(ex.orientation === "w" ? w - b : b - w).toBeGreaterThan(0);
+          // Every count has to be right.
+          expect(checkAnswer(q, structuredClone(q.answer))).toBe(true);
+          expect(checkAnswer(q, q.start)).toBe(false);
         } else if (q.kind === "defenders") {
           const piece = chess.get(q.square)!;
           expect(piece.type).not.toBe("k");

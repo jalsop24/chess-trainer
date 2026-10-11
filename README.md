@@ -47,8 +47,10 @@ puzzle and the best continuation.
    for the side solving the puzzle.
 3. **Ask a question** about the position after the sequence
    (`src/lib/exercise.ts`):
-   - **Material balance:** White minus Black, in points. Only asked when
-     material reflects who is better: the puzzle isn't won by mate, the solving
+   - **Material count:** how many queens, rooks, bishops, knights and pawns
+     each side has. The answer starts filled in with the starting position, so
+     the task is working out what changes. Only asked when material reflects
+     who is better: the puzzle isn't won by mate, the solving
      side is ahead, and no captures are pending later in the line.
    - **How many defenders:** how many pieces defend a piece that moved, or
      whose defenders changed, during the line.

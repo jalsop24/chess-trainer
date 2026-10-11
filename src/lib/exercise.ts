@@ -12,15 +12,29 @@ export type Puzzle = [id: string, fen: string, moves: string, rating: number, go
 export type QuestionKind = "material" | "defenders" | "pieceLocation" | "moveLegality";
 
 export const QUESTION_KINDS: { kind: QuestionKind; label: string }[] = [
-  { kind: "material", label: "Material balance" },
+  { kind: "material", label: "Material count" },
   { kind: "defenders", label: "How many defenders" },
   { kind: "pieceLocation", label: "Where did a piece go" },
   { kind: "moveLegality", label: "Is a move legal" },
 ];
 
+/** Pieces counted for material questions, in display order (kings are always there). */
+export const MATERIAL_TYPES = ["q", "r", "b", "n", "p"] as const;
+export type MaterialType = (typeof MATERIAL_TYPES)[number];
+export type PieceCounts = Record<MaterialType, number>;
+export type MaterialCounts = Record<Color, PieceCounts>;
+
 /** Every question has a short `prompt` and an optional smaller `hint` with the rules. */
 export type Question =
-  | { kind: "material"; prompt: string; hint?: string; answer: number; explanation: string }
+  | {
+      kind: "material";
+      prompt: string;
+      hint?: string;
+      /** Counts in the starting position, used to prefill the answer. */
+      start: MaterialCounts;
+      answer: MaterialCounts;
+      explanation: string;
+    }
   | { kind: "defenders"; prompt: string; hint?: string; square: Square; answer: number; explanation: string }
   | { kind: "pieceLocation"; prompt: string; hint?: string; answer: Square | "captured"; explanation: string }
   | { kind: "moveLegality"; prompt: string; hint?: string; answer: boolean; explanation: string };
@@ -74,6 +88,27 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return out;
 }
 
+export function pieceCounts(chess: Chess): MaterialCounts {
+  const empty = (): PieceCounts => ({ q: 0, r: 0, b: 0, n: 0, p: 0 });
+  const counts: MaterialCounts = { w: empty(), b: empty() };
+  for (const row of chess.board()) {
+    for (const sq of row) if (sq && sq.type !== "k") counts[sq.color][sq.type]++;
+  }
+  return counts;
+}
+
+export const sameCounts = (a: MaterialCounts, b: MaterialCounts) =>
+  (["w", "b"] as const).every((c) => MATERIAL_TYPES.every((t) => a[c][t] === b[c][t]));
+
+/** Answer values the UI can submit, one shape per question kind. */
+export type AnswerValue = number | boolean | Square | "captured" | MaterialCounts;
+
+export function checkAnswer(question: Question, value: AnswerValue): boolean {
+  if (question.kind === "material") return typeof value === "object" && sameCounts(question.answer, value);
+  return value === question.answer;
+}
+
+/** Total material in points (P=1, N=B=3, R=5, Q=9) per side. */
 export function materialCount(chess: Chess): { w: number; b: number } {
   const total = { w: 0, b: 0 };
   for (const row of chess.board()) {
@@ -181,15 +216,27 @@ function materialQuestion({ start, final, moves, fullLine, goal, solver }: LineC
   if (balance !== balanceOf(new Chess(fullLine[fullLine.length - 1].after))) return null;
   if ((solver === "w" ? balance : -balance) <= 0) return null;
 
-  const after = materialCount(final);
-  const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+  const before = pieceCounts(start);
+  const after = pieceCounts(final);
   return {
     kind: "material",
-    prompt: "After these moves, what is the material balance?",
-    hint: "White minus Black, in points: P=1, N=B=3, R=5, Q=9.",
-    answer: balance,
-    explanation: `White ${after.w} vs Black ${after.b}, so the balance is ${fmt(balance)} (it was ${fmt(balanceOf(start))} before the sequence).`,
+    prompt: "After these moves, what material does each side have?",
+    hint: "The counts start from the position shown. Adjust them for what changes.",
+    start: before,
+    answer: after,
+    explanation: (["w", "b"] as const).map((c) => describeChange(c, before[c], after[c])).join(" "),
   };
+}
+
+/** e.g. "White lost a knight and 2 pawns, and gained a queen." */
+function describeChange(color: Color, before: PieceCounts, after: PieceCounts): string {
+  const phrase = (t: MaterialType, n: number) => (n === 1 ? `a ${PIECE_NAMES[t]}` : `${n} ${PIECE_NAMES[t]}s`);
+  const list = (items: string[]) =>
+    items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+  const lost = MATERIAL_TYPES.filter((t) => after[t] < before[t]).map((t) => phrase(t, before[t] - after[t]));
+  const gained = MATERIAL_TYPES.filter((t) => after[t] > before[t]).map((t) => phrase(t, after[t] - before[t]));
+  const parts = [lost.length && `lost ${list(lost)}`, gained.length && `gained ${list(gained)}`].filter(Boolean);
+  return parts.length ? `${colorName(color)} ${parts.join(", and ")}.` : `${colorName(color)}'s material is unchanged.`;
 }
 
 /**
