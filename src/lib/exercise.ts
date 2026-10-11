@@ -103,8 +103,12 @@ export const sameCounts = (a: MaterialCounts, b: MaterialCounts) =>
 /** Answer values the UI can submit, one shape per question kind. */
 export type AnswerValue = number | boolean | Square | "captured" | MaterialCounts;
 
+/** Defender answers are buttons 0..DEFENDERS_MAX, the last meaning "this many or more". */
+export const DEFENDERS_MAX = 5;
+
 export function checkAnswer(question: Question, value: AnswerValue): boolean {
   if (question.kind === "material") return typeof value === "object" && sameCounts(question.answer, value);
+  if (question.kind === "defenders") return value === Math.min(question.answer, DEFENDERS_MAX);
   return value === question.answer;
 }
 

@@ -676,28 +676,12 @@ kbd {
   gap: 8px;
 }
 
-.number-answer {
-  display: flex;
-  gap: 8px;
-}
-
-.number-answer input {
-  width: 10rem;
-  height: 40px;
+/* Equal-width number choices, e.g. 0 1 2 3 4 5+ */
+.button--square {
+  min-width: 52px;
   padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-variant-numeric: tabular-nums;
-}
-
-.number-answer input:focus {
-  border-color: var(--accent);
-  outline: 3px solid var(--focus);
-  outline-offset: 0;
 }
 
 .square-answer {

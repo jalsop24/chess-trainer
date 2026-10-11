@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import {
+  DEFENDERS_MAX,
   QUESTION_KINDS,
   checkAnswer,
   generateExercise,
@@ -90,6 +91,8 @@ describe("generateExercise", () => {
           const piece = chess.get(q.square)!;
           expect(piece.type).not.toBe("k");
           expect(q.answer).toBe(chess.attackers(q.square, piece.color).length);
+          expect(checkAnswer(q, Math.min(q.answer, DEFENDERS_MAX))).toBe(true);
+          expect(checkAnswer(q, (q.answer + 1) % (DEFENDERS_MAX + 1))).toBe(false);
         } else if (q.kind === "pieceLocation") {
           if (q.answer !== "captured") expect(chess.get(q.answer)).toBeTruthy();
         } else if (q.kind === "moveLegality") {
@@ -119,5 +122,13 @@ describe("piece location questions", () => {
       const captured = ex.question.answer === "captured";
       expect(moves >= 2 || (captured && moves >= 1), ex.puzzleId).toBe(true);
     }
+  });
+});
+
+describe("checkAnswer", () => {
+  it('treats the top defenders button as "that many or more"', () => {
+    const q = { kind: "defenders", prompt: "", square: "e4", answer: 6, explanation: "" } as const;
+    expect(checkAnswer(q, DEFENDERS_MAX)).toBe(true);
+    expect(checkAnswer(q, DEFENDERS_MAX - 1)).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import type { Color, Square } from "chess.js";
 import { Board } from "./Board";
 import { pieceUrl } from "./pieces";
 import {
+  DEFENDERS_MAX,
   MATERIAL_TYPES,
   sameCounts,
   type AnswerValue,
@@ -19,12 +20,22 @@ interface AnswerInputProps {
 
 const EMPTY_FEN = "8/8/8/8/8/8/8/8 w - - 0 1";
 
+const DEFENDER_CHOICES = Array.from({ length: DEFENDERS_MAX + 1 }, (_, i) => i);
+
 export function AnswerInput({ question, orientation, onSubmit }: AnswerInputProps) {
   switch (question.kind) {
     case "material":
       return <MaterialAnswer start={question.start} onSubmit={onSubmit} />;
     case "defenders":
-      return <NumberAnswer label="Number of defenders" placeholder="e.g. 2" onSubmit={onSubmit} />;
+      return (
+        <div className="button-row" role="group" aria-label="Number of defenders">
+          {DEFENDER_CHOICES.map((n) => (
+            <button key={n} className="button button--square" onClick={() => onSubmit(n)}>
+              {n === DEFENDERS_MAX ? `${n}+` : n}
+            </button>
+          ))}
+        </div>
+      );
     case "pieceLocation":
       return <SquareAnswer orientation={orientation} onSubmit={onSubmit} />;
     case "moveLegality":
@@ -35,37 +46,6 @@ export function AnswerInput({ question, orientation, onSubmit }: AnswerInputProp
         </div>
       );
   }
-}
-
-interface NumberAnswerProps {
-  label: string;
-  placeholder: string;
-  onSubmit: (v: number) => void;
-}
-
-function NumberAnswer({ label, placeholder, onSubmit }: NumberAnswerProps) {
-  const [value, setValue] = useState("");
-  const parsed = Number(value.replace("−", "-"));
-  const valid = value.trim() !== "" && Number.isInteger(parsed);
-  return (
-    <form
-      className="number-answer"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (valid) onSubmit(parsed);
-      }}
-    >
-      <input
-        autoFocus
-        inputMode="numeric"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        aria-label={label}
-      />
-      <button type="submit" className="button button--primary" disabled={!valid}>Submit</button>
-    </form>
-  );
 }
 
 const SIDES = [
@@ -176,7 +156,7 @@ export function formatAnswer(question: Question, value: AnswerValue): string {
       // Counts don't fit in one line; App shows a MaterialComparison instead.
       return "";
     case "defenders":
-      return String(value);
+      return value === DEFENDERS_MAX ? `${DEFENDERS_MAX}+` : String(value);
     case "pieceLocation":
       return value === "captured" ? "Captured" : String(value);
     case "moveLegality":
