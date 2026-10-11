@@ -515,8 +515,8 @@ button:disabled {
   border-color: #6e6a63;
 }
 
-.exercise__rating {
-  color: var(--muted);
+.exercise__link {
+  font-weight: 500;
 }
 
 /* Move list: number | White | Black */

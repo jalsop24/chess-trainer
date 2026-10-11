@@ -219,17 +219,16 @@ export default function App() {
                   <span className="turn__dot" aria-hidden />
                   {toMove === "w" ? "White" : "Black"} to move
                 </span>
-                <span className="exercise__rating">
-                  Puzzle rating {exercise.rating}
-                  {revealed && (
-                    <>
-                      {" · "}
-                      <a href={`https://lichess.org/training/${exercise.puzzleId}`} target="_blank" rel="noreferrer">
-                        Lichess ↗
-                      </a>
-                    </>
-                  )}
-                </span>
+                {revealed && (
+                  <a
+                    className="exercise__link"
+                    href={`https://lichess.org/training/${exercise.puzzleId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Lichess ↗
+                  </a>
+                )}
               </div>
 
               <table className="moves">

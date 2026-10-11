@@ -48,7 +48,6 @@ export interface SequenceMove {
 
 export interface Exercise {
   puzzleId: string;
-  rating: number;
   /** The side that solves the puzzle; the board is shown from its point of view. */
   orientation: Color;
   startFen: string;
@@ -412,7 +411,7 @@ export function generateExercise({ puzzles, plies, kinds, rng = Math.random }: G
   // Some kinds suit only a minority of puzzles (material: ~1 in 4), and
   // attempts take well under a millisecond, so try plenty.
   for (let attempt = 0; attempt < 300; attempt++) {
-    const [puzzleId, startFen, uci, rating, goal] = pick(pool, rng);
+    const [puzzleId, startFen, uci, , goal] = pick(pool, rng);
     const fullLine = playUci(startFen, uci.split(" "));
     const moves = fullLine.slice(0, plies);
     const solver: Color = startFen.split(" ")[1] === "w" ? "b" : "w";
@@ -429,7 +428,6 @@ export function generateExercise({ puzzles, plies, kinds, rng = Math.random }: G
       if (!question) continue;
       return {
         puzzleId,
-        rating,
         orientation: solver,
         startFen,
         moves: moves.map((m) => ({ san: m.san, from: m.from, to: m.to, fenAfter: m.after })),
