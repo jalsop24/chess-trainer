@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Color, Square } from "chess.js";
 import { Board } from "./components/Board";
 import { AnswerInput, MaterialComparison, formatAnswer } from "./components/AnswerInput";
+import { SettingsMenu, settingsKey, type Settings } from "./components/SettingsMenu";
 import {
   QUESTION_KINDS,
   checkAnswer,
@@ -11,13 +12,7 @@ import {
   type Exercise,
   type MaterialCounts,
   type Puzzle,
-  type QuestionKind,
 } from "./lib/exercise";
-
-interface Settings {
-  plies: number;
-  kinds: QuestionKind[];
-}
 
 interface Stats {
   answered: number;
@@ -62,6 +57,8 @@ export default function App() {
   const [stats, setStats] = useState<Stats>(() => load("stats", EMPTY_STATS));
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
   const [step, setStep] = useState(0);
+  // Settings the current exercise was made with; differs from `settings` after an edit.
+  const [madeWith, setMadeWith] = useState<string | null>(null);
 
   const puzzlesRef = useRef<Puzzle[] | null>(null);
 
@@ -73,6 +70,7 @@ export default function App() {
     if (!puzzles) return;
     try {
       setPhase({ name: "asking", exercise: generateExercise({ puzzles, plies: s.plies, kinds: s.kinds }) });
+      setMadeWith(settingsKey(s));
     } catch (err) {
       setPhase({ name: "error", message: err instanceof Error ? err.message : String(err) });
     }
@@ -96,14 +94,9 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-    // Only on mount; settings changes trigger their own regeneration.
+    // Only on mount; settings changes apply from the next exercise.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const updateSettings = (s: Settings) => {
-    setSettings(s);
-    if (s.kinds.length > 0 && phase.name !== "revealed") nextExercise(s);
-  };
 
   const submit = (given: AnswerValue) => {
     if (phase.name !== "asking") return;
@@ -157,26 +150,32 @@ export default function App() {
           <BrandMark />
           <h1>Visualisation Trainer</h1>
         </div>
-        <dl className="stats" aria-label="Score">
-          <div>
-            <dt>Correct</dt>
-            <dd>
-              {stats.correct}
-              <span className="stats__of">/{stats.answered}</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Streak</dt>
-            <dd>{stats.streak}</dd>
-          </div>
-          <div>
-            <dt>Best</dt>
-            <dd>{stats.best}</dd>
-          </div>
-          <button className="ghost-button" onClick={() => setStats(EMPTY_STATS)} title="Reset score">
-            Reset
-          </button>
-        </dl>
+        <div className="header__actions">
+          <dl className="stats" aria-label="Score">
+            <div>
+              <dt>Correct</dt>
+              <dd>
+                {stats.correct}
+                <span className="stats__of">/{stats.answered}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Streak</dt>
+              <dd>{stats.streak}</dd>
+            </div>
+            <div>
+              <dt>Best</dt>
+              <dd>{stats.best}</dd>
+            </div>
+          </dl>
+          <SettingsMenu
+            settings={settings}
+            onChange={setSettings}
+            pending={exercise !== null && madeWith !== settingsKey(settings)}
+            onApplyNow={() => nextExercise(settings)}
+            onResetStats={() => setStats(EMPTY_STATS)}
+          />
+        </div>
       </header>
 
       <main className="layout">
@@ -302,56 +301,6 @@ export default function App() {
             </div>
           )}
 
-          <details className="card settings">
-            <summary>
-              Settings
-              <svg className="settings__chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </summary>
-            <div className="field">
-              <span className="field__label" id="length-label">
-                Sequence length <span className="field__hint">(half-moves)</span>
-              </span>
-              <div className="segmented" role="radiogroup" aria-labelledby="length-label">
-                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                  <button
-                    key={n}
-                    role="radio"
-                    aria-checked={settings.plies === n}
-                    className={settings.plies === n ? "is-active" : ""}
-                    onClick={() => updateSettings({ ...settings, plies: n })}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="field">
-              <span className="field__label">Question types</span>
-              <div className="chips">
-                {QUESTION_KINDS.map(({ kind, label }) => {
-                  const on = settings.kinds.includes(kind);
-                  return (
-                    <button
-                      key={kind}
-                      className={`chip${on ? " is-active" : ""}`}
-                      aria-pressed={on}
-                      onClick={() =>
-                        updateSettings({
-                          ...settings,
-                          kinds: on ? settings.kinds.filter((k) => k !== kind) : [...settings.kinds, kind],
-                        })
-                      }
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              {settings.kinds.length === 0 && <p className="error">Pick at least one question type.</p>}
-            </div>
-          </details>
         </section>
       </main>
 

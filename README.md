@@ -23,8 +23,9 @@ npm run dev
 Then open http://localhost:5173. Each exercise shows the start position, a
 move sequence and a question. After you answer, you can replay the line on the
 board with the ◀ ▶ buttons or the arrow keys, and press Enter for the next
-exercise. Use **Settings** to change the sequence length (2–10 half-moves) and
-choose which question types appear. Your score is saved in the browser.
+exercise. The settings button in the top right changes the sequence length
+(2–10 half-moves) and which question types appear; changes apply from the next
+exercise. Your score is saved in the browser.
 
 Other commands:
 

@@ -164,7 +164,6 @@ button:disabled {
 }
 
 .ghost-button {
-  margin-left: 4px;
   padding: 6px 10px;
   border: none;
   border-radius: 7px;
@@ -176,6 +175,108 @@ button:disabled {
 .ghost-button:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+.ghost-button--danger,
+.ghost-button--danger:hover {
+  color: var(--wrong);
+}
+
+.header__actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+/* ---------- Settings menu ---------- */
+
+.menu {
+  position: relative;
+  display: flex;
+}
+
+.menu__trigger {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.menu__trigger:hover,
+.menu__trigger.is-open {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.menu__trigger.is-open {
+  background: var(--accent-soft);
+}
+
+.menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  width: min(380px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 16px 40px rgba(0, 0, 0, 0.14);
+  animation: menu-in 0.12s ease-out;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.menu__section {
+  padding: 16px 16px 0;
+}
+
+.menu__section .field__label {
+  margin-bottom: 8px;
+}
+
+.menu__apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.menu__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 8px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 0 0 var(--radius) var(--radius);
+  font-size: 0.85rem;
+}
+
+.menu__footer > .ghost-button:only-child {
+  margin-left: -10px;
+}
+
+.menu__footer-actions {
+  display: flex;
+  gap: 4px;
 }
 
 /* ---------- Layout ---------- */
@@ -193,8 +294,12 @@ button:disabled {
     gap: 20px;
   }
 
-  .stats {
+  .header__actions {
     width: 100%;
+  }
+
+  .stats {
+    flex: 1;
   }
 
   .stats > div {
@@ -558,6 +663,13 @@ kbd {
   opacity: 0.45;
 }
 
+.button--small {
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -777,32 +889,6 @@ kbd {
 
 /* ---------- Settings ---------- */
 
-.settings summary {
-  cursor: pointer;
-  font-weight: 650;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.settings summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings__chevron {
-  color: var(--muted);
-  transition: transform 0.15s;
-}
-
-.settings[open] .settings__chevron {
-  transform: rotate(180deg);
-}
-
-.field {
-  margin-top: 16px;
-}
-
 .field__label {
   display: block;
   margin-bottom: 8px;
@@ -863,8 +949,12 @@ kbd {
   color: var(--muted);
 }
 
-.chip:hover {
+.chip:hover:not(:disabled) {
   color: var(--text);
+}
+
+.chip:disabled {
+  cursor: not-allowed;
 }
 
 .chip.is-active {
