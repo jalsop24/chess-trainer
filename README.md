@@ -27,6 +27,20 @@ exercise. The settings button in the top right changes the sequence length
 (2–10 half-moves) and which question types appear; changes apply from the next
 exercise. Your score is saved in the browser.
 
+### Progress
+
+- **Daily goal:** a number of correct answers per day (5, 10, 20 or 30; set in
+  the settings menu). The header ring shows today's progress.
+- **Day streak:** consecutive days you reached the goal. It survives until a
+  whole day passes without reaching it.
+- **Stats:** the progress button (bar chart icon) opens your accuracy by
+  question type and by sequence length, plus overall numbers.
+- **Achievements:** 13 badges for streaks, totals, long lines and daily habits,
+  defined in `src/lib/achievements.ts`.
+
+Progress is stored in the browser (`localStorage`). "Reset all progress" in the
+settings menu clears it.
+
 Other commands:
 
 | Command           | What it does                                       |

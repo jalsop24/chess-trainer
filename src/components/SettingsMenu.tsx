@@ -4,11 +4,15 @@ import { QUESTION_KINDS, type QuestionKind } from "../lib/exercise";
 export interface Settings {
   plies: number;
   kinds: QuestionKind[];
+  /** Correct answers per day that count towards the day streak. */
+  dailyGoal: number;
 }
 
+/** The settings an exercise depends on (the daily goal doesn't affect exercises). */
 export const settingsKey = (s: Settings) => `${s.plies}:${[...s.kinds].sort().join(",")}`;
 
 const PLY_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+const GOAL_OPTIONS = [5, 10, 20, 30];
 
 interface SettingsMenuProps {
   settings: Settings;
@@ -17,14 +21,14 @@ interface SettingsMenuProps {
   pending: boolean;
   /** Replace the current exercise with one using the current settings. */
   onApplyNow: () => void;
-  onResetStats: () => void;
+  onResetProgress: () => void;
 }
 
 /**
  * A gear button that opens a dropdown panel. Changes save immediately but only
  * shape the next exercise, so editing settings never yanks away the current one.
  */
-export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetStats }: SettingsMenuProps) {
+export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetProgress }: SettingsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -129,6 +133,25 @@ export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetS
             </div>
           </div>
 
+          <div className="menu__section">
+            <span className="field__label" id={`${panelId}-goal`}>
+              Daily goal <span className="field__hint">(correct answers)</span>
+            </span>
+            <div className="segmented" role="radiogroup" aria-labelledby={`${panelId}-goal`}>
+              {GOAL_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  role="radio"
+                  aria-checked={settings.dailyGoal === n}
+                  className={settings.dailyGoal === n ? "is-active" : ""}
+                  onClick={() => onChange({ ...settings, dailyGoal: n })}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="menu__apply">
             <span>Changes apply from the next exercise.</span>
             {pending && (
@@ -147,7 +170,7 @@ export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetS
           <div className="menu__footer">
             {confirmReset ? (
               <>
-                <span>Reset your score and streaks?</span>
+                <span>Reset score, stats and achievements?</span>
                 <span className="menu__footer-actions">
                   <button className="ghost-button" onClick={() => setConfirmReset(false)}>
                     Cancel
@@ -155,7 +178,7 @@ export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetS
                   <button
                     className="ghost-button ghost-button--danger"
                     onClick={() => {
-                      onResetStats();
+                      onResetProgress();
                       setConfirmReset(false);
                     }}
                   >
@@ -165,7 +188,7 @@ export function SettingsMenu({ settings, onChange, pending, onApplyNow, onResetS
               </>
             ) : (
               <button className="ghost-button" onClick={() => setConfirmReset(true)}>
-                Reset score
+                Reset all progress
               </button>
             )}
           </div>
